@@ -1,39 +1,68 @@
 #!/bin/bash
 
-LAST_COMMIT=""
+echo "Starting Whanos"
 
-if test -f /usr/share/jenkins_hash/JENKINS_HASH_$1; then
-    LAST_COMMIT=`cat /usr/share/jenkins_hash/JENKINS_HASH_$1`
-fi
-if [ "$LAST_COMMIT" != `git log -n 1  | grep commit | awk '{ print $2 }'` ]; then
-    echo "Changes occured, contenarization needed"
-    LANGUAGE=$(/var/jenkins_home/getLanguage.sh .)
+# Function to get the latest commit hash
+get_latest_commit_hash() {
+    git log -n 1 --pretty=format:"%H"
+}
 
-    if [ $? -eq 1 ]; then
-        echo "Error occured getting language"
-        exit 1
-    fi
-
-    echo "Detected language: $LANGUAGE"
-    if test -f "./Dockerfile"; then
+# Function to build Docker image based on language
+build_docker_image() {
+    local language=$1
+    if [ -f "./Dockerfile" ]; then
         echo "Using base image"
         docker build . -t whanos-project-$1
     else
         echo "Using standalone image"
-        docker build . -t whanos-project-$1 -f /images/$LANGUAGE/Dockerfile.standalone
+        docker build . -t whanos-project-$1 -f /images/$language/Dockerfile.standalone
     fi
+}
+
+# Function to deploy on Kubernetes
+deploy_on_kubernetes() {
+    if [ -f "./whanos.yml" ]; then
+        echo "Deploying on Kubernetes"
+        file_content=$(cat ./whanos.yml | base64 -w 0)
+        curl -H "Content-Type: application/json" -X POST -d "{\"image\":\"localhost:5000/whanos-project-$1\",\"config\":\"$file_content\",\"name\":\"$1\"}" http://localhost:3030/deployments
+    fi
+}
+
+echo "Starting Whanos"
+
+# Check if there is a stored commit hash for the project
+if [ -f "/usr/share/jenkins_hash/JENKINS_HASH_$1" ]; then
+    last_commit=$(cat "/usr/share/jenkins_hash/JENKINS_HASH_$1")
+fi
+
+# Compare the last stored commit hash with the latest commit in the repository
+if [ "$last_commit" != "$(get_latest_commit_hash)" ]; then
+    echo "Changes occurred, containerization needed"
+    language=$(/var/jenkins_home/getLanguage.sh .)
+
+    # Check for an error while detecting the programming language
+    if [ $? -eq 1 ]; then
+        echo "Error occurred getting language"
+        exit 1
+    fi
+
+    echo "Detected language: $language"
+
+    # Build the Docker image based on the detected language
+    build_docker_image "$language"
+
+    # Tag, push, pull, and clean up the Docker image
     docker tag whanos-project-$1 localhost:5000/whanos-project-$1
     docker push localhost:5000/whanos-project-$1
     docker pull localhost:5000/whanos-project-$1
     docker rmi whanos-project-$1
 
-    if test -f "./whanos.yml"; then
-        echo "Deploying on kubernetes"
-        FILE_CONTENT=`cat ./whanos.yml | base64 -w 0`
-        curl -H "Content-Type: application/json" -X POST -d "{\"image\":\"localhost:5000/whanos-project-$1\",\"config\":\"$FILE_CONTENT\",\"name\":\"$1\"}" http://localhost:3030/deployments
-    fi
+    # Deploy on Kubernetes if a configuration file exists
+    deploy_on_kubernetes "$1"
+
+    # Update the stored commit hash
     mkdir -p /usr/share/jenkins_hash
-    echo `git log -n 1  | grep commit | awk '{ print $2 }'` > /usr/share/jenkins_hash/JENKINS_HASH_$1
+    get_latest_commit_hash > "/usr/share/jenkins_hash/JENKINS_HASH_$1"
 else
-    echo "No changes occured"
+    echo "No changes occurred"
 fi
