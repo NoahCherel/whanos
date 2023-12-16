@@ -23,7 +23,9 @@ build_docker_image() {
 deploy_on_kubernetes() {
     if [ -f "./whanos.yml" ]; then
         echo "Deploying on Kubernetes"
-        kubectl apply -f ./whanos.yml --record
+        file_content=$(cat ./whanos.yml | base64 -w 0)
+        echo $file_content
+        curl -H "Content-Type: application/json" -X POST -d "{\"image\":\"localhost:5000/whanos-project-$1\",\"config\":\"$file_content\",\"name\":\"$1\"}" http://localhost:3030/deployments
     fi
 }
 
@@ -50,12 +52,14 @@ if [ "$last_commit" != "$(get_latest_commit_hash)" ]; then
     # Build the Docker image based on the detected language
     build_docker_image "$language"
 
-    # Tag and push the Docker image
+    # Tag, push, pull, and clean up the Docker image
     docker tag whanos-project-$1 localhost:5000/whanos-project-$1
     docker push localhost:5000/whanos-project-$1
+    docker pull localhost:5000/whanos-project-$1
+    docker rmi whanos-project-$1
 
     # Deploy on Kubernetes if a configuration file exists
-    deploy_on_kubernetes
+    deploy_on_kubernetes "$1"
 
     # Update the stored commit hash
     mkdir -p /usr/share/jenkins_hash
