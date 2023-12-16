@@ -1,4 +1,4 @@
-FROM maven:3.8.4-openjdk-17-slim
+FROM openjdk:21-jdk-slim
 
 SHELL ["/bin/bash", "-c"]
 
