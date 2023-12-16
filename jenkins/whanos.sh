@@ -7,11 +7,22 @@ get_latest_commit_hash() {
     git log -n 1 --pretty=format:"%H"
 }
 
+# Make a copy of the Dockerfile
+# Then
+# Change the first line of Dockerfile
+# Exemple FROM node:latest to FROM localhost:5000/whanos-node:latest
+change_dockerfile() {
+    local language=$1
+    cp ./Dockerfile ./Dockerfile.bak
+    sed -i "1s/.*/FROM localhost:5000\/whanos-$language:latest/" ./Dockerfile
+}
+
 # Function to build Docker image based on language
 build_docker_image() {
     local language=$1
     if [ -f "./Dockerfile" ]; then
         echo "Using base image"
+        change_dockerfile "$language"
         docker build . -t whanos-project-$1
     else
         echo "Using standalone image"
@@ -56,7 +67,7 @@ if [ "$last_commit" != "$(get_latest_commit_hash)" ]; then
     docker tag whanos-project-$1 localhost:5000/whanos-project-$1
     docker push localhost:5000/whanos-project-$1
     docker pull localhost:5000/whanos-project-$1
-    docker rmi whanos-project-$1
+    #docker rmi whanos-project-$1
 
     # Deploy on Kubernetes if a configuration file exists
     deploy_on_kubernetes "$1"
