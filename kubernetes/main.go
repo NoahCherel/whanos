@@ -6,17 +6,63 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+	"sigs.k8s.io/yaml"
 )
 
 type CreateDeploymentDto struct {
 	Image  string `json:"image"`
 	Config string `json:"config"`
 	Name   string `json:"name"`
+}
+
+type WhanosResources struct {
+	Limits   *apiv1.ResourceList `json:"limits,omitempty"`
+	Requests *apiv1.ResourceList `json:"requests,omitempty"`
+}
+
+type WhanosDeployment struct {
+	Replicas  *int32           `yaml:"replicas,omitempty"`
+	Resources *WhanosResources `yaml:"resources,omitempty"`
+	Ports     *[]int32         `yaml:"ports,omitempty"`
+}
+
+type WhanosConfig struct {
+	Deployment WhanosDeployment `yaml:"deployment"`
+}
+
+func getKubeconfig() string {
+	if home := homedir.HomeDir(); home != "" {
+		return filepath.Join(home, ".kube", "config")
+	}
+	return filepath.Join("/", ".kube", "config")
+}
+
+func getClientset(kubeconfig string) *kubernetes.Clientset {
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+	return clientset
+}
+
+func parseConfig(config string) (cfg WhanosConfig) {
+	if err := yaml.Unmarshal([]byte(config), &cfg); err != nil {
+		panic(err)
+	}
+	return cfg
 }
 
 func main() {
