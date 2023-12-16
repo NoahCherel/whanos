@@ -20,13 +20,20 @@ change_dockerfile() {
 # Function to build Docker image based on language
 build_docker_image() {
     local language=$1
+    local project_name=$2
     if [ -f "./Dockerfile" ]; then
         echo "Using base image"
+
         change_dockerfile "$language"
-        docker build . -t whanos-project-$1
+
+        echo "Language of the project:"
+        echo "$language"
+
+        docker build . -t whanos-project-$project_name
+        echo "Successfully built whanos-project-$project_name"
     else
         echo "Using standalone image"
-        docker build . -t whanos-project-$1 -f /images/$language/Dockerfile.standalone
+        docker build . -t whanos-project-$project_name -f /images/$language/Dockerfile.standalone
     fi
 }
 
@@ -61,7 +68,7 @@ if [ "$last_commit" != "$(get_latest_commit_hash)" ]; then
     echo "Detected language: $language"
 
     # Build the Docker image based on the detected language
-    build_docker_image "$language"
+    build_docker_image "$language" "$1"
 
     # Tag, push, pull, and clean up the Docker image
     echo "Tagging $1"
