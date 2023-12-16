@@ -64,8 +64,11 @@ if [ "$last_commit" != "$(get_latest_commit_hash)" ]; then
     build_docker_image "$language"
 
     # Tag, push, pull, and clean up the Docker image
+    echo "Tagging $1"
     docker tag whanos-project-$1 localhost:5000/whanos-project-$1
+    echo "Pushing"
     docker push localhost:5000/whanos-project-$1
+    echo "Pulling"
     docker pull localhost:5000/whanos-project-$1
     #docker rmi whanos-project-$1
 
