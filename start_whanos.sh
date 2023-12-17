@@ -19,7 +19,7 @@ docker build . -f jenkins/Dockerfile -t whanos-jenkins
 # Run Jenkins container
 cd jenkins
 docker run -d \
-     -v $(pwd):/var/jenkins_folder \
+     -v $(pwd):/var/jenkins_home \
      -v $(pwd)/../images:/images \
      --net=host \
      -v /var/run/docker.sock:/var/run/docker.sock \

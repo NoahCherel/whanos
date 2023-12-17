@@ -57,7 +57,7 @@ fi
 # Compare the last stored commit hash with the latest commit in the repository
 if [ "$git_commit_hash" != "$(get_latest_commit_hash)" ]; then
     echo "Changes occurred, containerization needed"
-    techno=$(/var/jenkins_folder/findTech.sh .)
+    techno=$(/var/jenkins_home/findTech.sh .)
 
     # Check for an error while detecting the programming techno
     if [ $? -eq 1 ]; then
