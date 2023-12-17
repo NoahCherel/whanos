@@ -18,7 +18,7 @@ jenkins:
       users:
         - id: "admin"
           name: "Admin"
-          password: ${PASWD}
+          password: ${ADMIN_PASSWORD}
 tool:
   git:
     installations:

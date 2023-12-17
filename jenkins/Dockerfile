@@ -16,10 +16,10 @@ RUN apt-get update && \
 RUN curl -fsSL https://get.docker.com/ | sh
 
 # Set the initial admin password
-ENV PASWD=test
+ENV ADMIN_PASSWORD=test
 
 # Define the location for Jenkins Configuration as an environment variable
-ENV CONF=/var/jenkins_home/jenkins.yml
+ENV CASC_JENKINS_CONFIG=/var/jenkins_home/jenkins.yml
 
 # Copy the list of plugins to be installed
 COPY ./jenkins/plugins.txt /usr/share/plugins.txt
