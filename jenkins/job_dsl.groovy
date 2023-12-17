@@ -98,7 +98,7 @@ freeStyleJob("link-project") {
                 cron(\'* * * * *\')
             }
             steps {
-                shell(\"/var/jenkins_home/whanos.sh $JOB_LABEL\")
+                shell(\"/var/jenkins_folder/whanos.sh $JOB_LABEL\")
             }
             wrappers {
                 preBuildCleanup()

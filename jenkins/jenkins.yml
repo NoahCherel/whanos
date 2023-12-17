@@ -18,14 +18,14 @@ jenkins:
       users:
         - id: "admin"
           name: "Admin"
-          password: ${ADMIN_PASSWORD}
+          password: ${PASWD}
 tool:
   git:
     installations:
       - name: git
         home: /usr/lib/git-core/git
 jobs:
-  - file: /var/jenkins_home/job_dsl.groovy
+  - file: /var/jenkins_folder/job_dsl.groovy
 security:
   globalJobDslSecurityConfiguration:
     useScriptSecurity: false

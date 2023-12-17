@@ -1,4 +1,4 @@
-module kubeapi
+module kube_binary_api_server
 
 go 1.16
 

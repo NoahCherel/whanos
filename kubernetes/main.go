@@ -19,53 +19,53 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-type CreateDeploymentDto struct {
+type NewDeploymentInput struct {
 	Image  string `json:"image"`
 	Config string `json:"config"`
 	Name   string `json:"name"`
 }
 
-type WhanosResources struct {
+type CustomResources struct {
 	Limits   *apiv1.ResourceList `json:"limits,omitempty"`
 	Requests *apiv1.ResourceList `json:"requests,omitempty"`
 }
 
-type WhanosService struct {
+type CustomService struct {
 	Type       string `yaml:"type,omitempty"`
 	TargetPort int32  `yaml:"targetPort,omitempty"`
 }
 
-type WhanosDeployment struct {
+type CustomDeployment struct {
 	Replicas  *int32           `yaml:"replicas,omitempty"`
-	Resources *WhanosResources `yaml:"resources,omitempty"`
+	Resources *CustomResources `yaml:"resources,omitempty"`
 	Ports     *[]int32         `yaml:"ports,omitempty"`
-	Service   *WhanosService   `yaml:"service,omitempty"`
+	Service   *CustomService   `yaml:"service,omitempty"`
 }
 
-type WhanosConfig struct {
-	Deployment WhanosDeployment `yaml:"deployment"`
+type CustomConfig struct {
+	Deployment CustomDeployment `yaml:"deployment"`
 }
 
-func getKubeconfig() string {
+func GetconfigPath() string {
 	if home := homedir.HomeDir(); home != "" {
 		return filepath.Join(home, ".kube", "config")
 	}
 	return filepath.Join("/", ".kube", "config")
 }
 
-func getClientset(kubeconfig string) *kubernetes.Clientset {
+func NewKubernetesClient(kubeconfig string) *kubernetes.Clientset {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		panic(err.Error())
 	}
-	clientset, err := kubernetes.NewForConfig(config)
+	newKube, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
 	}
-	return clientset
+	return newKube
 }
 
-func parseConfig(config string) (cfg WhanosConfig) {
+func getConf(config string) (cfg CustomConfig) {
 	if err := yaml.Unmarshal([]byte(config), &cfg); err != nil {
 		panic(err)
 	}
@@ -73,12 +73,12 @@ func parseConfig(config string) (cfg WhanosConfig) {
 }
 
 func main() {
-	var kubeconfig = getKubeconfig()
-	var clientset = getClientset(kubeconfig)
-	deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
+	var kubeconfig = GetconfigPath()
+	var newKube = NewKubernetesClient(kubeconfig)
+	ClientsDep := newKube.AppsV1().Deployments(apiv1.NamespaceDefault)
 	r := gin.Default()
 	r.POST("/deployments", func(c *gin.Context) {
-		var payload CreateDeploymentDto
+		var payload NewDeploymentInput
 		if err := c.ShouldBindJSON(&payload); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":       "malformed payload",
@@ -93,7 +93,7 @@ func main() {
 				"description": err.Error(),
 			})
 		}
-		var config = parseConfig(string(value))
+		var config = getConf(string(value))
 		var ports = []apiv1.ContainerPort{}
 		for idx := range *config.Deployment.Ports {
 			ports = append(ports, apiv1.ContainerPort{
@@ -146,40 +146,38 @@ func main() {
 		}
 
 		// Create the deployment
-		result, err := deploymentsClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
+		result, err := ClientsDep.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
 		}
 		fmt.Printf("Created deployment %q.\n", result.GetObjectMeta().GetName())
 
-		// Create the service if configured
-		if config.Deployment.Service != nil {
-			svc := &apiv1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: payload.Name + "-service",
+		// Always create the service
+		svc := &apiv1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: payload.Name + "-service",
+			},
+			Spec: apiv1.ServiceSpec{
+				Selector: map[string]string{
+					"app": payload.Name,
 				},
-				Spec: apiv1.ServiceSpec{
-					Selector: map[string]string{
-						"app": payload.Name,
+				Ports: []apiv1.ServicePort{
+					{
+						Protocol:   apiv1.ProtocolTCP,
+						Port:       80,
+						TargetPort: intstr.FromInt(int(3000)), // Assuming your app runs on port 3000
 					},
-					Ports: []apiv1.ServicePort{
-						{
-							Protocol:   apiv1.ProtocolTCP,
-							Port:       80,
-							TargetPort: intstr.FromInt(int(config.Deployment.Service.TargetPort)),
-						},
-					},
-					Type: apiv1.ServiceType(config.Deployment.Service.Type),
 				},
-			}
-
-			// Create the service
-			_, err := clientset.CoreV1().Services(apiv1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("Created service %q.\n", svc.GetObjectMeta().GetName())
+				Type: apiv1.ServiceTypeClusterIP,
+			},
 		}
+
+		// Create the service
+		_, err = newKube.CoreV1().Services(apiv1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Created service %q.\n", svc.GetObjectMeta().GetName())
 	})
 	r.Run(":3030")
 }

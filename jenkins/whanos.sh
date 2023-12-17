@@ -12,28 +12,28 @@ get_latest_commit_hash() {
 # Change the first line of Dockerfile
 # Exemple FROM node:latest to FROM localhost:5000/whanos-node:latest
 change_dockerfile() {
-    local language=$1
+    local techno=$1
     cp ./Dockerfile ./Dockerfile.bak
-    sed -i "1s/.*/FROM localhost:5000\/whanos-$language:latest/" ./Dockerfile
+    sed -i "1s/.*/FROM localhost:5000\/whanos-$techno:latest/" ./Dockerfile
 }
 
-# Function to build Docker image based on language
+# Function to build Docker image based on techno
 build_docker_image() {
-    local language=$1
+    local techno=$1
     local project_name=$2
     if [ -f "./Dockerfile" ]; then
         echo "Using base image"
 
-        change_dockerfile "$language"
+        change_dockerfile "$techno"
 
         echo "Language of the project:"
-        echo "$language"
+        echo "$techno"
 
         docker build . -t whanos-project-$project_name
         echo "Successfully built whanos-project-$project_name"
     else
         echo "Using standalone image"
-        docker build . -t whanos-project-$project_name -f /images/$language/Dockerfile.standalone
+        docker build . -t whanos-project-$project_name -f /images/$techno/Dockerfile.standalone
     fi
 }
 
@@ -51,24 +51,24 @@ echo "Starting Whanos"
 
 # Check if there is a stored commit hash for the project
 if [ -f "/usr/share/jenkins_hash/JENKINS_HASH_$1" ]; then
-    last_commit=$(cat "/usr/share/jenkins_hash/JENKINS_HASH_$1")
+    git_commit_hash=$(cat "/usr/share/jenkins_hash/JENKINS_HASH_$1")
 fi
 
 # Compare the last stored commit hash with the latest commit in the repository
-if [ "$last_commit" != "$(get_latest_commit_hash)" ]; then
+if [ "$git_commit_hash" != "$(get_latest_commit_hash)" ]; then
     echo "Changes occurred, containerization needed"
-    language=$(/var/jenkins_home/getLanguage.sh .)
+    techno=$(/var/jenkins_folder/findTech.sh .)
 
-    # Check for an error while detecting the programming language
+    # Check for an error while detecting the programming techno
     if [ $? -eq 1 ]; then
-        echo "Error occurred getting language"
+        echo "Error occurred getting techno"
         exit 1
     fi
 
-    echo "Detected language: $language"
+    echo "Detected techno: $techno"
 
-    # Build the Docker image based on the detected language
-    build_docker_image "$language" "$1"
+    # Build the Docker image based on the detected techno
+    build_docker_image "$techno" "$1"
 
     # Tag, push, pull, and clean up the Docker image
     echo "Tagging $1"
