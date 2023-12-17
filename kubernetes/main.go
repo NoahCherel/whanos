@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -29,10 +30,16 @@ type WhanosResources struct {
 	Requests *apiv1.ResourceList `json:"requests,omitempty"`
 }
 
+type WhanosService struct {
+	Type       string `yaml:"type,omitempty"`
+	TargetPort int32  `yaml:"targetPort,omitempty"`
+}
+
 type WhanosDeployment struct {
 	Replicas  *int32           `yaml:"replicas,omitempty"`
 	Resources *WhanosResources `yaml:"resources,omitempty"`
 	Ports     *[]int32         `yaml:"ports,omitempty"`
+	Service   *WhanosService   `yaml:"service,omitempty"`
 }
 
 type WhanosConfig struct {
@@ -137,11 +144,42 @@ func main() {
 				},
 			},
 		}
+
+		// Create the deployment
 		result, err := deploymentsClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
 		}
 		fmt.Printf("Created deployment %q.\n", result.GetObjectMeta().GetName())
+
+		// Create the service if configured
+		if config.Deployment.Service != nil {
+			svc := &apiv1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: payload.Name + "-service",
+				},
+				Spec: apiv1.ServiceSpec{
+					Selector: map[string]string{
+						"app": payload.Name,
+					},
+					Ports: []apiv1.ServicePort{
+						{
+							Protocol:   apiv1.ProtocolTCP,
+							Port:       80,
+							TargetPort: intstr.FromInt(int(config.Deployment.Service.TargetPort)),
+						},
+					},
+					Type: apiv1.ServiceType(config.Deployment.Service.Type),
+				},
+			}
+
+			// Create the service
+			_, err := clientset.CoreV1().Services(apiv1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("Created service %q.\n", svc.GetObjectMeta().GetName())
+		}
 	})
 	r.Run(":3030")
 }

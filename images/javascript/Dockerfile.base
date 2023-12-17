@@ -8,6 +8,8 @@ ONBUILD COPY package.json .
 
 ONBUILD COPY package-lock.json .
 
+ONBUILD COPY tsconfig.json .
+
 ONBUILD RUN ["npm", "install"]
 
 ONBUILD COPY app/ ./app/

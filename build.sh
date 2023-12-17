@@ -1,13 +1,13 @@
 #!/bin/bash
 
+#minikube start
+
 # Start Kubernetes API server
 ./kubernetes/kubeapi &
 
 # Set insecure registries configuration
 echo '{ "insecure-registries":    ["localhost:5000"] }' | sudo tee /etc/docker/daemon.json
 sudo systemctl restart docker
-
-minikube start
 
 # Remove and checkout Jenkins directory
 sudo rm -rf jenkins/
